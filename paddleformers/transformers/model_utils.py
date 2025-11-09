@@ -1288,6 +1288,13 @@ def replace_name_and_gen_index(path, total_size):
     with open(os.path.join(path, index_file_name), "w") as f:
         json.dump(index_infos, f, indent=4)
 
+def get_common_folder(file_list):
+    dirnames = [os.path.dirname(f) for f in file_list]
+    common_folder = dirnames[0]
+    if all(d == common_folder for d in dirnames):
+        return common_folder
+    else:
+        raise ValueError("All files must be in the same folder!")
 
 @six.add_metaclass(InitTrackerMeta)
 class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
@@ -2938,6 +2945,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             variant=variant,
         )
 
+        file_list = resolved_sharded_files if is_sharded else [resolved_archive_file]
+        ckpt_path = get_common_folder(file_list)
         # 3. init the model
         init_args = config["init_args"] or ()
         with ContextManagers(init_contexts):
@@ -2945,11 +2954,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         if hasattr(cls, "_gen_aoa_config") and load_checkpoint_format == "flex_checkpoint":
             aoa_config = cls._gen_aoa_config(config)
-
             sharded_state_dict = model.sharded_state_dict()
             dist.load_state_dict(
                 sharded_state_dict,
-                path=pretrained_model_name_or_path,
+                path=ckpt_path,
                 aoa_config=aoa_config,
                 safetensors=True,
                 offload=load_via_cpu,
