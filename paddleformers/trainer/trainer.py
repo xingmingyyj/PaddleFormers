@@ -3568,6 +3568,9 @@ class Trainer:
         if self.args.pipeline_model_parallel_size > 1:
             return self.training_pipeline_step(model, inputs)
 
+        if hasattr(model, "_prepare_unified_non_pp_data"):
+            model._prepare_unified_non_pp_data(inputs)
+
         model.train()
         inputs = self._prepare_inputs(inputs)
         with self.autocast_smart_context_manager():
